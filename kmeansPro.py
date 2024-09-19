@@ -1,26 +1,23 @@
 import numpy as np
-import plotly.graph_objects as go
-import plotly.colors as colors
-
-
+import matplotlib.pyplot as plt
 class kmeansPro:
     def __init__(self):
-        kmeansPro.NumCluster=None
-        kmeansPro.centers=None
-        kmeansPro.points=None
-        kmeansPro.idx=None
-        kmeansPro.goodness=None
-        kmeansPro.clustr_counts=None
+        self.NumCluster=None
+        self.centers=None
+        self.points=None
+        self.idx=None
+        self.goodness=None
+        self.clustr_counts=None
 
     def replace_with(self, other):
         # Replace attributes of self with those of other
         self.__dict__.update(other.__dict__)
-
+        
     def fit(self,data:np.ndarray,k=None,Num_repeat=50):
         '''
         if k is not given it calculate the K using max possible method with 20% sample in each cluster
         Num_repeat is the number of times that it goes through the fiting the clusters to find the best data clustering with the most uniform distance between samples and centers
-
+        
         '''
         def inner_fit(clustered_i,data:np.ndarray,k:int):
             Num_sam,Num_var=data.shape
@@ -98,7 +95,7 @@ class kmeansPro:
         it plot the data distribution among the clusters
         it also show the new data with its assign cluster
         '''
-        fig=go.Figure()
+        plt.figure()
         Num_sam,Num_var=self.points.shape
         data=self.points
         centers=self.centers
@@ -108,23 +105,24 @@ class kmeansPro:
             axis_plot=np.array([1, min(2, Num_var)])
 
         axis_plot=axis_plot-1
-        color_scale = colors.get_colorscale('Jet')  # Get the 'Jet' colorscale
-        color_map = [colors.sample_colorscale(color_scale, i / (K-1)) for i in range(K)]  # Generate k distinct colors
+        colors = plt.cm.jet(np.linspace(0, 1, len(np.unique(idx)))) 
         for i in range(K):
-            fig.add_trace(go.Scatter(x=data[idx==i,axis_plot[0]], y=data[idx==i,axis_plot[1]],name='Cluster'+str(i+1),mode='markers',marker=dict(size=10,color=color_map[i]*Num_sam), showlegend=True))
-            fig.add_trace(go.Scatter(x=[centers[i,axis_plot[0]]],y=[centers[i,axis_plot[1]]],name='Centers cluster'+str(i+1),mode='markers',marker=dict(size=20,color=color_map[i],symbol='hexagon'),showlegend=True))
+            plt.scatter(data[idx == i, axis_plot[0]], data[idx == i, axis_plot[1]],s=100,color=colors[i],  label='Cluster ' + str(i+1))
+            plt.scatter([centers[i,axis_plot[0]]], [centers[i,axis_plot[1]]],marker='*',s=100,color=colors[i],  label='Centers cluster'+str(i+1))
 
         if new_candiates is not None:
             candidates_idx=self.hosting_cluster(new_candiates,method,K_nn).reshape(-1)
-            Num_candidates=new_candiates.shape[0]
-            candiates_color=[None]*Num_candidates
-            for i in range(candidates_idx.shape[0]):
-                candiates_color[i]=color_map[int(candidates_idx[i])]
-            for j in range(Num_candidates):
-                fig.add_trace(go.Scatter(x=[new_candiates[j,axis_plot[0]]], y=[new_candiates[j,axis_plot[1]]],name='New Candidates'+str(j+1),mode='markers',marker=dict(size=20,color=candiates_color[j],symbol='star'), showlegend=True))
-            
-        fig.update_layout(width=600,height=600,xaxis=dict(scaleanchor="y", scaleratio=1))
-        fig.show()
+            for i in range(K):
+                if np.sum(candidates_idx==i)>0:
+                    plt.scatter(new_candiates[candidates_idx==i,axis_plot[0]], new_candiates[candidates_idx==i,axis_plot[1]],color=colors[i],marker='h',s=150,  label='New Candidates of cluster '+str(i+1))
+
+
+        plt.legend(loc='best')
+        plt.xlabel('Input Var'+str(axis_plot[0]+1)+' Of '+str(data.shape[1])+'Input Var')
+        plt.ylabel('Input Var'+str(axis_plot[1]+1)+' Of '+str(data.shape[1])+'Input Var')
+        plt.title('Data Distribution among '+str(K)+'Cluster(S)')
+        plt.pause(0.5)
+        plt.show(block=False)
     def hosting_cluster(self,new_candiates,method=1,K_nn=3):
         """
         method1 determin the hosting cluster based on nearest center

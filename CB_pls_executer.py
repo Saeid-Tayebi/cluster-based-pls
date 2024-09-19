@@ -1,16 +1,16 @@
 #%%
 import numpy as np
 from CB_PLS import CB_PLS as cpls
-
+from kmeansPro import kmeansPro as kmp
 # Model further settings
 np.set_printoptions(precision=4)
 
 # data creation
-Num_sam=40
+Num_sam=100
 input_var=5
 output_var=4
 num_clusters=5
-N_testing=50
+N_testing=5
 
 X=np.random.rand(Num_sam,input_var)
 X_new=np.random.rand(N_testing,input_var)
@@ -21,7 +21,7 @@ y_new=X_new @ true_beta.T
 # %%
 # Training the model No clustering 
 cluster_pls_no=cpls()
-cluster_pls_no.Train(X,Y,1,K=1,ploting_clusters=False)
+cluster_pls_no.Train(X,Y,1,K=1,ploting_clusters=True)
 Y_new_pre_no,pre_accuracy_no=cluster_pls_no.evaluator(X_new,None,y_new)
 # Training the model X clustering
 cluster_pls_x=cpls()
@@ -57,4 +57,5 @@ Y_new_pre_y3,pre_accuracy_y3=cluster_pls_y.evaluator(X_new,None,y_new,y_hosting_
 print(f'prediction Accuracy Y Clustering method 1 (AVERAGE={np.mean(pre_accuracy_y1)})')#,all = ({pre_accuracy_no})')#
 print(f'prediction Accuracy Y Clustering method 2 (AVERAGE={np.mean(pre_accuracy_y2)})')#,all = ({pre_accuracy_x})')
 print(f'prediction Accuracy Y Clustering method 3 (AVERAGE={np.mean(pre_accuracy_y3)})')#,all = ({pre_accuracy_y})')
+#input()
 # %%

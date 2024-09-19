@@ -150,7 +150,6 @@ class MyPca:
 
 
     def visual_plot(self, score_axis=None, X_test=None, color_code_data=None, data_labeling=False, testing_labeling=False):
-
         # inner Functions
         def confidenceline(r1, r2, center):
             t = np.linspace(0, 2 * np.pi, 100)  # Increase the number of points for a smoother ellipse
@@ -158,23 +157,22 @@ class MyPca:
             y = center[1] + r2 * np.sin(t)
             return x, y
         
-        def inner_ploter(y_data,position,legend_str,X_test=None,y_data_add=None,legend_str2=None):       
+        def inner_ploter(y_data,position,legend_str,X_test=None,y_data_add=None,lim_line=None):       
             X_data = np.arange(1, len(y_data) + 1)
-            fig2.add_trace(go.Scatter(x=X_data, y=y_data, mode='markers', marker=dict(color='blue', size=10), name=legend_str,showlegend=True),
-                    row=position[0], col=position[1])
+            legend_str1=legend_str+' (Calibration Dataset)'
+            legend_str2=legend_str+'(New Dataset)'
+            legend_str3=legend_str+r'$_{lim}$'
+            plt.subplot(2,1,position[0])
+            plt.plot(X_data,y_data,'bo',label=legend_str1)
             if X_test is not None:
                 y_data = np.concatenate((y_data, y_data_add))
                 X_data = np.arange(1, len(y_data) + 1)
-                fig2.add_trace(go.Scatter(x=X_data[Num_obs:], y=y_data[Num_obs:], mode='markers', marker=dict(color='red', symbol='star', size=12), name=legend_str2,showlegend=True),
-                        row=position[0], col=position[1])
-            fig2.add_trace(go.Scatter(x=[1, X_data[-1] + 1], y=[self.T2_lim[-1]] * 2, mode='lines', line=dict(color='black', dash='dash'), name='Hoteling T^2 Lim',showlegend=False),
-                    row=position[0], col=position[1])
-            fig2.update_xaxes(
-            tickmode='linear',  # Ensures all ticks are shown linearly
-            tick0=2,            # Starting tick (adjust if needed)
-            dtick=1,            # Interval between ticks
-            range=[0.5, len(X_data)+0.5],
-            row=position[0], col=position[1] ) # Apply only to the specific subplot
+                plt.plot(X_data[Num_obs:],y_data[Num_obs:],'r*',label=legend_str2)
+            plt.plot([1, X_data[-1] + 1],[lim_line] * 2,'k--',label=legend_str3)   
+            plt.legend()
+            plt.xlabel('Observations')
+            plt.ylabel(legend_str)
+        
 
         # Ploting Parameters
         Num_obs, Num_com = self.T.shape
@@ -182,23 +180,9 @@ class MyPca:
             score_axis = np.array([1, min(2, Num_com)])
 
         # Create subplots
-        fig1 = make_subplots(
-            rows=2, cols=2,
-            subplot_titles=(
-                'PLS Score Plot Distribution','Loading of'+str(score_axis[0])+'Component','Loading of'+str(score_axis[1])+'Component'),          
-            specs=[[{"colspan": 2}, None],   
-                [{}, {}]],row_heights=[0.5, 0.5])
+        fig1=plt.figure(1)
+        fig2=plt.figure(2)
 
-        fig2 = make_subplots(
-            rows=2, cols=1,
-            subplot_titles=(
-                'SPE_X','Hoteling T^2 Plot'),          
-            specs=[[{}],[{}]],row_heights=[0.5, 0.5]
-        )
-        # axis labeling
-        fig1.update_xaxes(title_text='T '+str(score_axis[0])+'score',row=1,col=1)
-        fig1.update_yaxes(title_text='T '+str(score_axis[1])+'score',row=1,col=1)
-        fig2.update_xaxes(title_text='Observations',row=4,col=1)
         #score plot
         tscore_x = self.T[:, score_axis[0] - 1]
         tscore_y = self.T[:, score_axis[1] - 1]
@@ -208,17 +192,22 @@ class MyPca:
         xr, yr = confidenceline(r1, r2, np.array([0, 0]))
         label_str = f'Confidence Limit ({self.alpha * 100}%)'
 
-        fig1.add_trace(go.Scatter(x=xr, y=yr, mode='lines', line=dict(color='black', dash='dash'), name=label_str,showlegend=True),row=1, col=1)
+        plt.figure(fig1.number)
+        plt.suptitle('PCA Model Visual Plotting(scores)')
+        plt.subplot(2,2,(1,2))
+        plt.plot(xr,yr,'k--',label=label_str)
         if color_code_data is None:
-            fig1.add_trace(go.Scatter(x=tscore_x, y=tscore_y, mode='markers', marker=dict(color='blue', size=10), name='Score(Training Dataset)',showlegend=True),row=1, col=1)
+            plt.plot(tscore_x,tscore_y,'ob',s=10,label='Scores(Training Dataset)')
         else:
-            fig1.add_trace(go.Scatter(x=tscore_x, y=tscore_y,mode='markers',marker=dict(size=10,color=color_code_data,colorscale='Viridis', colorbar=dict(orientation='h',y=1.3,yanchor='top'),showscale=True,),name='Score(Training Dataset)', showlegend=True,),row=1,col=1)
-        
+            cmap = plt.get_cmap('viridis')
+            norm = plt.Normalize(vmin=min(color_code_data), vmax=max(color_code_data))  
+            plt.scatter(tscore_x,tscore_y,c=color_code_data, cmap='viridis',s=100,label='Scores(Training Dataset)')
+            plt.colorbar()
         
         if data_labeling:  
             for i in range(Num_obs):   
-                fig1.add_trace(go.Scatter(x=[tscore_x[i]], y=[tscore_y[i]], text=str(i + 1), mode='text', textposition='top center',showlegend=False),
-                        row=1, col=1)
+                plt.text(tscore_x[i],tscore_y[i],str(i+1),fontsize=10,ha='center',va='bottom')
+
         # Testing Data
         tscore_testing, hoteling_t2_testing, spe_x_testing=None,None,None
         if X_test is not None:
@@ -227,14 +216,14 @@ class MyPca:
 
             t_score_x_new = tscore_testing[:, score_axis[0] - 1]
             t_score_y_new = tscore_testing[:, score_axis[1] - 1]
-
-            fig1.add_trace(go.Scatter(x=t_score_x_new, y=t_score_y_new, mode='markers', marker=dict(color='red', symbol='star', size=12), name='Score(New Data)',showlegend=True),
-                        row=1, col=1)
+            plt.plot(t_score_x_new,t_score_y_new,'r*',label='Score(New Data)')
             if testing_labeling:
                 for i in range(Num_new):
-                    fig1.add_trace(go.Scatter(x=[t_score_x_new[i]], y=[t_score_y_new[i]], text=str(i + 1), mode='text', textposition='top center',showlegend=False),
-                                row=1, col=1)
-
+                    plt.text([t_score_x_new[i]],[t_score_y_new[i]],str(i+1),color='red',fontsize=10,ha='center',va='bottom')
+        plt.legend()
+        plt.xlabel(r'T$_{'+str(score_axis[0])+r'}$ score')
+        plt.ylabel(r'T$_{'+str(score_axis[1])+r'}$ score')
+        plt.title('PCA Score Plot Distribution')
         # Loading bar plots
         for k in range(2):
             Num_var_X=self.Xtrain_normal.shape[1]
@@ -242,19 +231,24 @@ class MyPca:
             y_data=self.P[:,k]
             for j in range(Num_var_X):
                 x_data[j]='variable '+str(j+1)
-            fig1.add_trace(go.Bar(x=x_data,y=y_data,name='Loding'+str(score_axis[k]),marker=dict(color='blue')),row=2,col=k+1)
-        
+            plt.subplot(2,2,k+3)
+            plt.bar(x_data,y_data,label='Loding'+str(score_axis[k]),color='blue')
+            plt.title('Loading of'+str(score_axis[k])+'Component')
+        plt.pause(0.1)
+        plt.show(block=False)
+
+        plt.figure(fig2.number)
+        plt.suptitle('PCA Model Visual Plotting(Statistics)')
         # SPE_X Plot
         y_data = self.SPE_x[:, -1]
-        inner_ploter(y_data,[1,1],'SPE_X(Training Data)',X_test,spe_x_testing,'SPE_X(New Data)')
+        lim_lin=self.SPE_lim_x[-1]
+        inner_ploter(y_data,[1],r'SPE$_{X}$',X_test,spe_x_testing,lim_lin)
         # Hoteling T^2 Plot
         y_data = self.tsquared[:, -1]
-        inner_ploter(y_data,[2,1],'Hoteling T2(Training Data)',X_test,hoteling_t2_testing,'Hoteling T2(New Data)')
-    
+        lim_lin=self.T2_lim[-1]
+        inner_ploter(y_data,[2],r'HotelingT$^{2}$',X_test,hoteling_t2_testing,lim_lin)    
     
         # Update layout for font sizes and other customization
-        fig1.update_layout(title_text='PLS Model Visual Plotting(scores)',title_x=0.5,font=dict(size=15),legend=dict(x=1, y=1, traceorder='normal'),showlegend=True )
-        fig2.update_layout(title_text='PLS Model Visual Plotting(Statistics)',title_x=0.5,font=dict(size=15),legend=dict(x=1, y=1, traceorder='normal'),showlegend=True )
-        fig1.show()
-        fig2.show()
+        plt.pause(0.1)
+        plt.show(block=False)
 

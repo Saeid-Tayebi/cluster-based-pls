@@ -1,7 +1,6 @@
 import numpy as np
 from scipy.stats import chi2, f
-import plotly.graph_objects as go
-from plotly.subplots import make_subplots
+import matplotlib.pyplot as plt
 
 class MyPls:
     def __init__(self):
@@ -182,7 +181,7 @@ class MyPls:
             m = np.mean(spe)
             v = np.var(spe,ddof=1)
             spe_lim = v / (2 * m) * chi2.ppf(alpha, 2 * m**2 / (v+1e-15))
-            Rsquare = 1 - np.var(Error,ddof=1) / np.var(Original_block,ddof=1) # not applicaple for pls vali
+            Rsquare = 1 - np.var(Error,ddof=1) / np.var(Original_block,ddof=1) 
         return spe, spe_lim, Rsquare
 
     def T2_calculations(self,T, Num_com, Num_obs, alpha):
@@ -222,31 +221,26 @@ class MyPls:
 
 
     def visual_plot(self, score_axis=None, X_test=None, data_labeling=False, testing_labeling=False):
-
-        # inner Functions
         def confidenceline(r1, r2, center):
-            t = np.linspace(0, 2 * np.pi, 100)  # Increase the number of points for a smoother ellipse
-            x = center[0] + r1 * np.cos(t)
-            y = center[1] + r2 * np.sin(t)
-            return x, y
-        
-        def inner_ploter(y_data,position,legend_str,X_test=None,y_data_add=None,legend_str2=None):       
+                t = np.linspace(0, 2 * np.pi, 100)  # Increase the number of points for a smoother ellipse
+                x = center[0] + r1 * np.cos(t)
+                y = center[1] + r2 * np.sin(t)
+                return x, y
+        def inner_ploter(y_data,position,legend_str,X_test=None,y_data_add=None,lim_line=None):       
             X_data = np.arange(1, len(y_data) + 1)
-            fig.add_trace(go.Scatter(x=X_data, y=y_data, mode='markers', marker=dict(color='blue', size=10), name=legend_str,showlegend=True),
-                    row=position[0], col=position[1])
+            legend_str1=legend_str+' (Calibration Dataset)'
+            legend_str2=legend_str+'(New Dataset)'
+            legend_str3=legend_str+r'$_{lim}$'
+            plt.subplot(3,2,position[0])
+            plt.plot(X_data,y_data,'bo',label=legend_str1)
             if X_test is not None:
                 y_data = np.concatenate((y_data, y_data_add))
                 X_data = np.arange(1, len(y_data) + 1)
-                fig.add_trace(go.Scatter(x=X_data[Num_obs:], y=y_data[Num_obs:], mode='markers', marker=dict(color='red', symbol='star', size=12), name=legend_str2,showlegend=True),
-                        row=position[0], col=position[1])
-            fig.add_trace(go.Scatter(x=[1, X_data[-1] + 1], y=[self.T2_lim[-1]] * 2, mode='lines', line=dict(color='black', dash='dash'), name='Hoteling T^2 Lim',showlegend=False),
-                    row=position[0], col=position[1])
-            fig.update_xaxes(
-            tickmode='linear',  # Ensures all ticks are shown linearly
-            tick0=2,            # Starting tick (adjust if needed)
-            dtick=1,            # Interval between ticks
-            range=[0.5, len(X_data)+0.5],
-            row=position[0], col=position[1] ) # Apply only to the specific subplot
+                plt.plot(X_data[Num_obs:],y_data[Num_obs:],'r*',label=legend_str2)
+            plt.plot([1, X_data[-1] + 1],[lim_line] * 2,'k--',label=legend_str3)   
+            plt.legend()
+            plt.xlabel('Observations')
+            plt.ylabel(legend_str)
 
         # Ploting Parameters
         Num_obs, Num_com = self.T.shape
@@ -254,19 +248,12 @@ class MyPls:
             score_axis = np.array([1, min(2, Num_com)])
 
         # Create subplots
-        fig = make_subplots(
-            rows=3, cols=2,
-            subplot_titles=(
-                'PLS Score Plot Distribution','SPE_X', 'SPE_Y Plot','Hoteling T^2 Plot'),
-            specs=[[{"colspan": 2}, None],   # Row 1: Plot 1 spans columns 1 and 2
-                [{}, {}],                        # Row 2: Normal 2-column layout
-                [{"colspan":2}, {}]]             # Row 3: Normal 2-column layout
-        ,row_heights=[0.5, 0.25, 0.25],
-        )
+        plt.subplot(3,2,(1,2))
+        plt.suptitle('PLS Model Visual Plotting(scores)')
         # axis labeling
-        fig.update_xaxes(title_text='T '+str(score_axis[0])+'score',row=1,col=1)
-        fig.update_yaxes(title_text='T '+str(score_axis[1])+'score',row=1,col=1)
-        fig.update_xaxes(title_text='Observations',row=3,col=1)
+        plt.xlabel('T '+str(score_axis[0])+'score')
+        plt.ylabel('T '+str(score_axis[1])+'score')
+
         #score plot
         tscore_x = self.T[:, score_axis[0] - 1]
         tscore_y = self.T[:, score_axis[1] - 1]
@@ -275,62 +262,43 @@ class MyPls:
         r2 = self.ellipse_radius[score_axis[1] - 1]
         xr, yr = confidenceline(r1, r2, np.array([0, 0]))
         label_str = f'Confidence Limit ({self.alpha * 100}%)'
+        plt.plot(xr,yr,'k--',label=label_str)
+        plt.scatter(tscore_x, tscore_y, color='b', marker='o', s=50, label='Score (Training Dataset)')
 
-        fig.add_trace(go.Scatter(x=xr, y=yr, mode='lines', line=dict(color='black', dash='dash'), name=label_str,showlegend=True),
-                    row=1, col=1)
-        fig.add_trace(go.Scatter(x=tscore_x, y=tscore_y, mode='markers', marker=dict(color='blue', size=10), name='Score(Training Dataset)',showlegend=True),
-                    row=1, col=1)
         
         
         if data_labeling:
             for i in range(Num_obs):
-                fig.add_trace(go.Scatter(x=[tscore_x[i]], y=[tscore_y[i]], text=str(i + 1), mode='text', textposition='top center',showlegend=False),
-                            row=1, col=1)
+                plt.text(tscore_x[i],tscore_y[i],str(i+1),fontsize=10, ha='center', va='bottom')
         # Testing Data
+        tscore_testing, hoteling_t2_testing, spe_x_testing, spe_y_testing=None,None,None,None
         if X_test is not None:
             Num_new = X_test.shape[0]
             _, tscore_testing, hoteling_t2_testing, spe_x_testing, spe_y_testing = self.evaluation(X_test)
 
             t_score_x_new = tscore_testing[:, score_axis[0] - 1]
             t_score_y_new = tscore_testing[:, score_axis[1] - 1]
+            plt.scatter(t_score_x_new, t_score_y_new, color='r', marker='*', s=70, label='Score(New Dataset)')
 
-            fig.add_trace(go.Scatter(x=t_score_x_new, y=t_score_y_new, mode='markers', marker=dict(color='red', symbol='star', size=12), name='Score(New Data)',showlegend=True),
-                        row=1, col=1)
-            if testing_labeling:
+            if data_labeling:
                 for i in range(Num_new):
-                    fig.add_trace(go.Scatter(x=[t_score_x_new[i]], y=[t_score_y_new[i]], text=str(i + 1), mode='text', textposition='top center',showlegend=False),
-                                row=1, col=1)
+                    plt.text(t_score_x_new[i],t_score_y_new[i],str(i+1),fontsize=10, ha='center', va='bottom',color='red')
 
         
-        if X_test is not None:
-            # SPE_X Plot
-            y_data = self.SPE_x[:, -1]
-            inner_ploter(y_data,[2,1],'SPE_X(Training Data)',X_test,spe_x_testing,'SPE_X(New Data)')
-            # SPE_Y Plot
-            y_data = self.SPE_y[:, -1]
-            inner_ploter(y_data,[2,2],'SPE_Y(Training Data)',X_test,spe_y_testing,'SPE_Y(New Data)')
-            # Hoteling T^2 Plot
-            y_data = self.tsquared[:, -1]
-            inner_ploter(y_data,[3,1],'Hoteling T2(Training Data)',X_test,hoteling_t2_testing,'Hoteling T2(New Data)')
-        else:
-            # SPE_X Plot
-            y_data = self.SPE_x[:, -1]
-            inner_ploter(y_data,[2,1],'SPE_X(Training Data)')
-            # SPE_Y Plot
-            y_data = self.SPE_y[:, -1]
-            inner_ploter(y_data,[2,2],'SPE_Y(Training Data)')
-            # Hoteling T^2 Plot
-            y_data = self.tsquared[:, -1]
-            inner_ploter(y_data,[3,1],'Hoteling T2(Training Data)')
-    
-        # Update layout for font sizes and other customization
-        fig.update_layout(
-        title_text='PLS Model Visual Plotting',
-        title_x=0.5,
-        font=dict(size=15),
-        legend=dict(x=1, y=1, traceorder='normal'),
-        showlegend=True,
-        # Use annotations for X and Y labels for the entire figure
-        )
-        fig.show()
-
+        
+        # SPE_X Plot
+        y_data = self.SPE_x[:, -1]
+        lim_line=self.SPE_lim_x[-1]
+        inner_ploter(y_data,[3],'SPE_X',X_test,spe_x_testing,lim_line)
+        # SPE_Y Plot
+        y_data = self.SPE_y[:, -1]  
+        lim_line=self.SPE_lim_y[-1]
+        inner_ploter(y_data,[4],'SPE_Y',X_test,spe_y_testing,lim_line)
+        
+        # Hoteling T^2 Plot
+        y_data = self.tsquared[:, -1]
+        lim_line=self.T2_lim[-1]
+        inner_ploter(y_data,[(5,6)],'Hoteling T2',X_test,hoteling_t2_testing,lim_line)
+        plt.legend(loc='best')
+        plt.pause(0.1)
+        plt.show(block=False)
