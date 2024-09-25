@@ -72,7 +72,7 @@ class MyPca:
 
             covered_var[:,i]=np.var(t1,axis=0,ddof=1)
             # SPE_X
-            SPE_x[:, i], SPE_lim_x[i], Rx[i] = self.SPE_calculation(T, P, X_0, alpha)
+            SPE_x[:, i], SPE_lim_x[i], Rx[i] = self.SPE_calculation(T, P, X_0, alpha,is_train=1)
 
             # Hotelling T2 Related Calculations
             tsquared[:, i], T2_lim[i], ellipse_radius[i] = self.T2_calculations(T[:, :i+1], i+1, Num_obs, alpha)
@@ -112,14 +112,14 @@ class MyPca:
 
         return x_hat_new,T_score,Hotelin_T2,SPE_X
 
-    def SPE_calculation(self,score, loading, Original_block, alpha):
+    def SPE_calculation(self,score, loading, Original_block, alpha,is_train=0):
         # Calculation of SPE and limits
         X_hat = score @ loading.T
         Error = Original_block - X_hat
         #Error.reshape(-1,loading.shape[1])
         spe = np.sum(Error**2, axis=1)
         spe_lim, Rsquare=None,None
-        if Original_block.shape[0]>1:
+        if is_train==1:
             m = np.mean(spe)
             v = np.var(spe,ddof=1)
             spe_lim = v / (2 * m) * chi2.ppf(alpha, 2 * m**2 / (v+1e-15))
@@ -251,4 +251,3 @@ class MyPca:
         # Update layout for font sizes and other customization
         plt.pause(0.1)
         plt.show(block=False)
-

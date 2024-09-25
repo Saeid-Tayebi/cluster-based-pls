@@ -6,10 +6,10 @@ from kmeansPro import kmeansPro as kmp
 np.set_printoptions(precision=4)
 
 # data creation
-Num_sam=100
-input_var=5
-output_var=4
-num_clusters=5
+Num_sam=20
+input_var=3
+output_var=3
+num_clusters=3
 N_testing=5
 
 X=np.random.rand(Num_sam,input_var)

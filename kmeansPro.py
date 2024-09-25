@@ -13,7 +13,7 @@ class kmeansPro:
         # Replace attributes of self with those of other
         self.__dict__.update(other.__dict__)
         
-    def fit(self,data:np.ndarray,k=None,Num_repeat=50):
+    def fit(self,data:np.ndarray,k=None,Num_repeat=1000,min_cluster_threshold=0.01):
         '''
         if k is not given it calculate the K using max possible method with 20% sample in each cluster
         Num_repeat is the number of times that it goes through the fiting the clusters to find the best data clustering with the most uniform distance between samples and centers
@@ -29,7 +29,7 @@ class kmeansPro:
             selected_samples = np.random.choice(data.shape[0], size=k, replace=False)
             C=data[selected_samples,:]
             #Assignment
-            stop_condition=0
+            stop_cond=0
             while True:
                 idx_old=idx.copy()
                 for i in range(Num_sam):
@@ -44,12 +44,12 @@ class kmeansPro:
                     C[i,:]=np.mean(data[idx.reshape(-1)==i,:],axis=0)
                 
                 if np.all(idx==idx_old):
-                    stop_condition=stop_condition+1
-                if stop_condition==10:
+                    stop_cond=stop_cond+1
+                if stop_cond==10:
                     break
-            goodness=np.std(dist_to_center,ddof=1)
+            goodness=np.sum(dist_to_center)
             __, clustr_counts = np.unique(idx,return_counts=True)
-
+ 
             clustered_i.NumCluster=k
             clustered_i.centers=C
             clustered_i.points=data
@@ -69,23 +69,22 @@ class kmeansPro:
             goodness_list[i]=clustered_i.goodness
         best_one_idx=np.argmin(goodness_list)
         best_cluster=clusters_list[best_one_idx]
-        self.replace_with(best_cluster)
-    
-    def max_possible_num_cluster(self,data:np.ndarray,threshold=0.2,K0=None):
+        self.replace_with(best_cluster)    
+    def max_possible_num_cluster(self,data:np.ndarray,min_cluster_threshold=0.2,K0=None):
         '''
         find the max possible number of cluster to make sure each cluster contains at least
         threshold portion of the entire samples
         if K0 is a number in would check its possibility and if not if would decrease the k0 from this point down
         '''
         Num_sam=data.shape[0]
-        threshold=np.round(threshold*Num_sam)
+        min_cluster_threshold=np.round(min_cluster_threshold*Num_sam)
         if K0 is None:
-            K0=int(np.round(Num_sam/threshold))
+            K0=int(np.round(Num_sam/min_cluster_threshold))
         kmean_model=kmeansPro()  
         while True:
-            kmean_model.fit(data,K0)
+            kmean_model.fit(data,K0,Num_repeat=3)
             unique, counts = np.unique(kmean_model.idx,return_counts=True)
-            if np.min(counts)>threshold:
+            if np.min(counts)>min_cluster_threshold:
                 break
             K0=K0-1
         return K0

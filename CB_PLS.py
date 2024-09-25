@@ -13,7 +13,7 @@ class CB_PLS:
         self.pls_models=None
         self.other=None  # it would be second cb_pls if the mode is 3
         
-    def Train(self,X,Y,clustering_mode=1,A_pca=None,A_pls=None,ploting_clusters=False,K=None):
+    def Train(self,X,Y,clustering_mode=1,A_pca=None,A_pls=None,ploting_clusters=False,K=None,min_cluster_threshold=0.2):
         '''
         receive the data and clustering_mode (either based on X,Y or both)
         if it is based on Y it clusters data based on Y and then find the hosting cluster
@@ -24,7 +24,7 @@ class CB_PLS:
             Z=X
             if clustering_mode==2:
                 Z=Y
-            self.Classifier_Fcn(Z,A_pca,ploting_clusters,K)
+            self.Classifier_Fcn(Z,A_pca,ploting_clusters,K,min_cluster_threshold)
             self.Pls_developer(X,Y,A_pls)
             self.X=X
             self.Y=Y
@@ -34,22 +34,33 @@ class CB_PLS:
             self.other.Train(X,Y,2,A_pca,A_pls,ploting_clusters,K)
         self.clustering_mode=clustering_mode
 
-    def Classifier_Fcn(self,Z,A=None,ploting_clusters=False,K=None):
+    def Classifier_Fcn(self,Z,A=None,ploting_clusters=False,K=None,min_cluster_threshold=0.2):
         '''
         should receive either X or Y (Z can be either) for which it want to apply the clustering
         '''
         # determine the number of components (using Num_components_sugg) if it is not given by the used
         if A is None:
             A=self.Num_components_sugg(Z)
-        
         # developing the pca
         pca_model=pca()
         pca_model.train(Z,A)
         to_be_clustered_data=pca_model.T
         # sending the corresponding scores for clustering
         Kmean_structure=kmp()
+        if K==1:
+            Num_repeat=1
+        else:
+            Num_repeat=1000
+        while True:
+            
+            Kmean_structure.fit(to_be_clustered_data,K,Num_repeat)
+            min_count=np.min(Kmean_structure.clustr_counts)
+            if min_count<=3:
+                K=K-1
+                K=Kmean_structure.max_possible_num_cluster(to_be_clustered_data,min_cluster_threshold,K0=K)
+            elif min_count>3:
+                break
         Kmean_structure.pca_model=pca_model
-        Kmean_structure.fit(to_be_clustered_data,K)
         if ploting_clusters is True:
             Kmean_structure.visual_ploting()
         
@@ -68,8 +79,7 @@ class CB_PLS:
             x_data=X[idx==i,:]
             y_data=Y[idx==i,:]
             pls_model=pls()
-            if A_pls is None:
-                A_pls=self.Num_components_sugg(x_data)
+            A_pls=self.Num_components_sugg(x_data)
             pls_model.train(x_data,y_data,A_pls)
             pls_models[i]=pls_model
         self.pls_models=pls_models
@@ -112,25 +122,25 @@ class CB_PLS:
             Xtr=self.X
             idx_y=self.clustere_str.idx.reshape(-1)
             K=self.clustere_str.NumCluster
-            spe_normalized=np.zeros((K,))
+            spe_normalized=np.zeros((K,x_new.shape[0]))
             hoteling_normalized=np.zeros_like(spe_normalized)
-
+            spe_i=np.zeros((1,x_new.shape[0]))
+            hotelingt2_i=np.zeros_like(spe_i)
             for i in range(K):
                 x_pca=Xtr[idx_y==i,:]
-                if A_pca is None:
-                    A_pca=self.Num_components_sugg(x_pca,ploting)
+                A_pca=self.Num_components_sugg(x_pca,ploting)
                 ith_pca_model=pca()
                 ith_pca_model.train(x_pca,A_pca)
                 __,__,hotelingt2_i,spe_i=ith_pca_model.evaluation(x_new)
-                spe_normalized[i]=spe_i/ith_pca_model.SPE_lim_x[-1]
-                hoteling_normalized[i]=hotelingt2_i/ith_pca_model.T2_lim[-1]
+                spe_normalized[i,:]=spe_i/(ith_pca_model.SPE_lim_x[-1]+0.00001)
+                hoteling_normalized[i,:]=hotelingt2_i/ith_pca_model.T2_lim[-1]
             if y_hosting_method==1:  # spe normalized
-                hosting_cluster=np.argmin(spe_normalized)
+                hosting_cluster=np.argmin(spe_normalized,axis=0)
             elif y_hosting_method==2: # hoteling normalized
-                hosting_cluster=np.argmin(hoteling_normalized)
+                hosting_cluster=np.argmin(hoteling_normalized,axis=0)
             elif y_hosting_method==3: # both nortmalized
                 sum_spe_hoteling=spe_normalized+hoteling_normalized
-                hosting_cluster=np.argmin(sum_spe_hoteling)
+                hosting_cluster=np.argmin(sum_spe_hoteling,axis=0)
         return hosting_cluster
             
     def evaluator(self,x_new,clustering_mode=None,y_new=None,y_hosting_method=1,x_hosting_method=1,k_nn=3):
@@ -142,9 +152,9 @@ class CB_PLS:
         # if mode is 1 or 2
         if clustering_mode==1 or clustering_mode==2:
             y_pre=np.zeros((x_new.shape[0],self.Y.shape[1]))
+            hosting_cluster=self.Cluster_determination(clustering_mode,x_new,y_hosting_method,x_hosting_method,k_nn)
             for ii in range(x_new.shape[0]):   
-                hosting_cluster=self.Cluster_determination(clustering_mode,x_new[ii,:].reshape(1,-1),y_hosting_method,x_hosting_method,k_nn)
-                y_pre[ii,:],__,__,__,__=self.pls_models[int(hosting_cluster)].evaluation(x_new[ii,:].reshape(1,-1))
+                y_pre[ii,:],__,__,__,__=self.pls_models[int(hosting_cluster[ii])].evaluation(x_new[ii,:].reshape(1,-1))
     
         elif clustering_mode==3: #
             y_pre1,__=self.evaluator(x_new,1,y_new,y_hosting_method,x_hosting_method,k_nn)

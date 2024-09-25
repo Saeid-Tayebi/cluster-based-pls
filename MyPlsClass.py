@@ -40,6 +40,7 @@ class MyPls:
             Num_com=X.shape[1]
         if Num_com>(X.shape[0]-1):
             Num_com=X.shape[0]-1
+        
         # Data Preparation
         X_orining = X
         Y_orining = Y
@@ -98,7 +99,7 @@ class MyPls:
             U[:, i] = unew
             Q[:, i] = q1
             # SPE_X
-            SPE_x[:, i], SPE_lim_x[i], Rx[i] = self.SPE_calculation(T, P, X_0, alpha)
+            SPE_x[:, i], SPE_lim_x[i], Rx[i] = self.SPE_calculation(T, P, X_0, alpha,is_train=1)
 
             # SPE_Y
             SPE_y[:, i], SPE_lim_y[i], Ry[i] = self.SPE_calculation(T, Q, Y_0, alpha)
@@ -170,14 +171,14 @@ class MyPls:
         return y_pre,T_score,Hotelin_T2,SPE_X,SPE_Y
 
 
-    def SPE_calculation(self,score, loading, Original_block, alpha):
+    def SPE_calculation(self,score, loading, Original_block, alpha,is_train=0):
         # Calculation of SPE and limits
         X_hat = score @ loading.T
         Error = Original_block - X_hat
         #Error.reshape(-1,loading.shape[1])
         spe = np.sum(Error**2, axis=1)
         spe_lim, Rsquare=None,None
-        if Original_block.shape[0]>1:
+        if is_train==1:
             m = np.mean(spe)
             v = np.var(spe,ddof=1)
             spe_lim = v / (2 * m) * chi2.ppf(alpha, 2 * m**2 / (v+1e-15))
