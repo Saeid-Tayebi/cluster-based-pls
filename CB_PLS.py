@@ -3,7 +3,7 @@ import numpy as np
 from MyPcaClass import MyPca as pca
 from MyPlsClass import MyPls as pls
 from kmeansPro import kmeansPro as kmp
-import matplotlib.pyplot as plt
+import sys
 class CB_PLS:
     def __init__(self):
         self.X=None
@@ -13,7 +13,7 @@ class CB_PLS:
         self.pls_models=None
         self.other=None  # it would be second cb_pls if the mode is 3
         
-    def Train(self,X,Y,clustering_mode=1,A_pca=None,A_pls=None,ploting_clusters=False,K=None,min_cluster_threshold=0.2):
+    def Train(self,X,Y,clustering_mode=1,A_pca=None,A_pls=None,ploting_clusters=False,K=None,min_cluster_threshold=0.2,Nrepeat=None):
         '''
         receive the data and clustering_mode (either based on X,Y or both)
         if it is based on Y it clusters data based on Y and then find the hosting cluster
@@ -24,23 +24,24 @@ class CB_PLS:
             Z=X
             if clustering_mode==2:
                 Z=Y
-            self.Classifier_Fcn(Z,A_pca,ploting_clusters,K,min_cluster_threshold)
+                if Y.shape[1]<2:
+                    print('Output Dimension is less than 2, Operator is not possible')
+                    sys.exit(0)
+
+            self.Classifier_Fcn(Z,A_pca,ploting_clusters,K,min_cluster_threshold,Nrepeat)
             self.Pls_developer(X,Y,A_pls)
             self.X=X
             self.Y=Y
         elif clustering_mode==3:
-            self.Train(X,Y,1,A_pca,A_pls,ploting_clusters,K)
+            self.Train(X,Y,1,A_pca,A_pls,ploting_clusters,K,Nrepeat=Nrepeat)
             self.other=CB_PLS()
-            self.other.Train(X,Y,2,A_pca,A_pls,ploting_clusters,K)
+            self.other.Train(X,Y,2,A_pca,A_pls,ploting_clusters,K,Nrepeat=Nrepeat)
         self.clustering_mode=clustering_mode
 
-    def Classifier_Fcn(self,Z,A=None,ploting_clusters=False,K=None,min_cluster_threshold=0.2):
+    def Classifier_Fcn(self,Z,A=None,ploting_clusters=False,K=None,min_cluster_threshold=0.2,Nrepeat=None):
         '''
         should receive either X or Y (Z can be either) for which it want to apply the clustering
         '''
-        # determine the number of components (using Num_components_sugg) if it is not given by the used
-        if A is None:
-            A=self.Num_components_sugg(Z)
         # developing the pca
         pca_model=pca()
         pca_model.train(Z,A)
@@ -48,12 +49,10 @@ class CB_PLS:
         # sending the corresponding scores for clustering
         Kmean_structure=kmp()
         if K==1:
-            Num_repeat=1
-        else:
-            Num_repeat=1000
+            Nrepeat=1
         while True:
             
-            Kmean_structure.fit(to_be_clustered_data,K,Num_repeat)
+            Kmean_structure.fit(to_be_clustered_data,K,Nrepeat)
             min_count=np.min(Kmean_structure.clustr_counts)
             if min_count<=3:
                 K=K-1
@@ -69,7 +68,7 @@ class CB_PLS:
     
     def Pls_developer(self,X,Y,A_pls=None):
         '''
-        developing PLS models for each cluster (for now use Num_components_sugg) 
+        developing PLS models for each cluster 
         '''
         kmean_structure=self.clustere_str
         idx=kmean_structure.idx.reshape(-1)
@@ -79,31 +78,9 @@ class CB_PLS:
             x_data=X[idx==i,:]
             y_data=Y[idx==i,:]
             pls_model=pls()
-            A_pls=self.Num_components_sugg(x_data)
-            pls_model.train(x_data,y_data,A_pls)
+            pls_model.train(x_data,y_data)
             pls_models[i]=pls_model
         self.pls_models=pls_models
-        
-    def Num_components_sugg(self,Z,ploting=False):
-        '''
-        Z can be either X or Y
-        determines the number of components that describe the data quite good using the eigenvalue_greater_than_one_rule
-        '''
-        pca_model=pca()
-        pca_model.train(Z)
-        eig_val=pca_model.covered_var
-        Num_com_sugg=np.sum(eig_val>1)
-        if ploting==True:
-            plt.figure()
-            plt.bar(range(1,eig_val.shape[1]+1),eig_val.reshape(-1),label='Covered Variance')
-            plt.xlabel('Components')
-            plt.ylabel('Variance Covered')
-            plt.plot([0,eig_val.shape[1]+1],[1,1],'k--',label='Threshold Line')
-            plt.legend()
-            plt.show()
-        # plot the eig_Val using barchart to show if suggested A is rational or not
-
-        return Num_com_sugg
 
     def Cluster_determination(self,clustering_mode,x_new,y_hosting_method=1,x_hosting_method=1,k_nn=3,A_pca=None,ploting=False):
         '''
@@ -128,7 +105,6 @@ class CB_PLS:
             hotelingt2_i=np.zeros_like(spe_i)
             for i in range(K):
                 x_pca=Xtr[idx_y==i,:]
-                A_pca=self.Num_components_sugg(x_pca,ploting)
                 ith_pca_model=pca()
                 ith_pca_model.train(x_pca,A_pca)
                 __,__,hotelingt2_i,spe_i=ith_pca_model.evaluation(x_new)
